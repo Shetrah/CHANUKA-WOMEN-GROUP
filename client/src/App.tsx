@@ -1,8 +1,8 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Layout } from "@/components/Layout";
 import Login from "@/pages/Login";
@@ -12,36 +12,59 @@ import ReportsPage from "@/pages/Dashboard/Reports";
 import NotFound from "@/pages/not-found";
 
 function Router() {
+  const { user } = useAuth();
+  const [location] = useLocation();
+
+  // Redirect to login if not authenticated and not already on login page
+  if (!user && location !== "/login") {
+    return <Redirect to="/login" />;
+  }
+
+  // Redirect to dashboard if authenticated and on login page
+  if (user && location === "/login") {
+    return <Redirect to="/dashboard" />;
+  }
+
   return (
-    <Layout>
-      <Switch>
-        <Route path="/login" component={Login} />
-        
-        <Route path="/dashboard">
+    <Switch>
+      <Route path="/login" component={Login} />
+      
+      <Route path="/dashboard">
+        {() => (
           <ProtectedRoute>
-            <Overview />
+            <Layout>
+              <Overview />
+            </Layout>
           </ProtectedRoute>
-        </Route>
-        
-        <Route path="/dashboard/users">
+        )}
+      </Route>
+      
+      <Route path="/dashboard/users">
+        {() => (
           <ProtectedRoute>
-            <UsersPage />
+            <Layout>
+              <UsersPage />
+            </Layout>
           </ProtectedRoute>
-        </Route>
-        
-        <Route path="/dashboard/reports">
+        )}
+      </Route>
+      
+      <Route path="/dashboard/reports">
+        {() => (
           <ProtectedRoute>
-            <ReportsPage />
+            <Layout>
+              <ReportsPage />
+            </Layout>
           </ProtectedRoute>
-        </Route>
+        )}
+      </Route>
 
-        <Route path="/">
-          <Redirect to="/dashboard" />
-        </Route>
+      <Route path="/">
+        <Redirect to="/dashboard" />
+      </Route>
 
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 

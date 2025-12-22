@@ -21,7 +21,7 @@ export function ProtectedRoute({ children, requiredRole = "admin" }: ProtectedRo
   }
 
   if (!user) {
-    return <Redirect to="/login" />;
+    return null; // Let Router handle the redirect to avoid flickering or nested Layout issues
   }
 
   // In a real app, we'd check custom claims or firestore user doc for role
