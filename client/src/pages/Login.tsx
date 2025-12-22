@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShieldAlert, Loader2 } from "lucide-react";
+import { Users2, Loader2 } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -44,10 +44,10 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-2 text-center lg:text-left">
             <div className="inline-flex items-center justify-center p-3 rounded-xl bg-primary/10 text-primary mb-4">
-              <ShieldAlert className="w-8 h-8" />
+              <Users2 className="w-8 h-8" />
             </div>
             <h1 className="text-3xl lg:text-4xl font-display font-bold text-slate-900">
-              Admin Portal
+              Chanuka Deaf Women Group
             </h1>
             <p className="text-muted-foreground text-lg">
               Sign in to manage users and GBV reports.

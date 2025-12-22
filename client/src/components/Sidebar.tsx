@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, FileText, LogOut, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, Users, FileText, LogOut, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
@@ -17,10 +17,10 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-slate-900 text-white transition-transform hidden md:flex flex-col">
       <div className="flex items-center gap-3 px-6 py-8 border-b border-white/10">
         <div className="bg-primary/20 p-2 rounded-lg">
-          <ShieldAlert className="w-6 h-6 text-primary-foreground" />
+          <Users2 className="w-6 h-6 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="font-display font-bold text-lg tracking-tight">SafeHaven</h1>
+          <h1 className="font-display font-bold text-lg tracking-tight">Chanuka Deaf Women Group</h1>
           <p className="text-xs text-slate-400 font-medium">Admin Portal</p>
         </div>
       </div>
