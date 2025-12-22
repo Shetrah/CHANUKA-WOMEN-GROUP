@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Check if the user is authenticated and is an admin
+    // We assume the user's email is the document ID in 'approved_users' collection
+    // OR we query by email field (rules don't support queries, so lookup by ID is best)
+    // For this dashboard, we will assume the 'approved_users' collection uses the user's Email as the Document ID.
+    function isAdmin() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/approved_users/$(request.auth.token.email)) &&
+             get(/databases/$(database)/documents/approved_users/$(request.auth.token.email)).data.role == "admin" &&
+             get(/databases/$(database)/documents/approved_users/$(request.auth.token.email)).data.isActive == true;
+    }
+
+    // Approved Users Collection
+    match /approved_users/{email} {
+      allow read: if request.auth != null && (request.auth.token.email == email || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // GBV Reports Collection
+    match /gbv_reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if true; // Public reporting allowed? Or auth only? Assuming true for now.
+      allow update: if isAdmin(); // Only admins can update status
+      allow delete: if false; // No deletion allowed
+    }
+  }
+}
