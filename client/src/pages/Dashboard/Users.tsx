@@ -5,30 +5,41 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Mail, Users2, ShieldCheck, MoreHorizontal, UserX, UserCheck, Users } from "lucide-react";
+import { Plus, Search, Users2, MoreHorizontal, UserX, UserCheck, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertApprovedUserSchema, type InsertApprovedUser } from "@shared/schema";
+import { insertApprovedUserSchema } from "@shared/schema";
 import { z } from "zod";
 
-// Extending schema for form validation
+// Schema including name and email
 const formSchema = insertApprovedUserSchema.extend({
+  name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
 });
 
 type UserFormValues = z.infer<typeof formSchema>;
+
+// Function to get initials from full name
+const getInitials = (name: string) => {
+  if (!name) return "";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
 
 export default function UsersPage() {
   const { data: users, isLoading } = useUsers();
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
+  // Safe search filtering with optional chaining and defaults
   const filteredUsers = users?.filter(user => 
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.role.toLowerCase().includes(searchTerm.toLowerCase())
+    (user.name ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.email ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.role ?? "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -47,7 +58,7 @@ export default function UsersPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="Search by email..." 
+              placeholder="Search by name, email, or role..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 bg-white"
@@ -113,18 +124,18 @@ function UserRow({ user }: { user: any }) {
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-            {user.email.substring(0, 2).toUpperCase()}
+            {getInitials(user.name ?? "")}
           </div>
           <div>
-            <div className="font-medium text-slate-900">{user.email}</div>
-            <div className="text-xs text-muted-foreground">ID: {user.id.substring(0, 8)}...</div>
+            <div className="font-medium text-slate-900">{user.name ?? "No Name"} <span className="text-sm text-muted-foreground">({user.email ?? "No Email"})</span></div>
+            <div className="text-xs text-muted-foreground">ID: {user.id?.substring(0, 8) ?? "N/A"}...</div>
           </div>
         </div>
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-2 text-sm text-slate-700">
           <Users2 className="w-4 h-4 text-slate-400" />
-          <span className="capitalize">{user.role}</span>
+          <span className="capitalize">{user.role ?? "N/A"}</span>
         </div>
       </td>
       <td className="px-6 py-4">
@@ -170,11 +181,12 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean, onOpenChange:
   const form = useForm<UserFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      name: "",
       email: "",
       role: "admin",
       isActive: true,
-      approvedBy: "System Admin"
-    }
+      approvedBy: "System Admin",
+    },
   });
 
   const onSubmit = (data: UserFormValues) => {
@@ -200,6 +212,16 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean, onOpenChange:
         </DialogHeader>
         
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+          {/* Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name">Full Name</Label>
+            <Input id="name" {...form.register("name")} placeholder="John Doe" />
+            {form.formState.errors.name && (
+              <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+            )}
+          </div>
+
+          {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>
             <Input id="email" {...form.register("email")} placeholder="user@example.com" />
@@ -207,7 +229,8 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean, onOpenChange:
               <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
             )}
           </div>
-          
+
+          {/* Role */}
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
             <Select 
@@ -220,11 +243,11 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean, onOpenChange:
               <SelectContent>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="moderator">Moderator</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {/* Buttons */}
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" className="btn-primary" disabled={createUser.isPending}>
