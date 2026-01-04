@@ -1,4 +1,12 @@
-import { useDashboardStats } from "@/hooks/use-stats";
+import { useEffect, useState } from "react";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  Timestamp
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { StatsCard } from "@/components/StatsCard";
 import { Users, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import {
@@ -12,19 +20,94 @@ import {
   Cell
 } from "recharts";
 
-export default function Overview() {
-  const { data: stats, isLoading } = useDashboardStats();
+type Stats = {
+  totalUsers: number;
+  pendingReports: number;
+  resolvedReports: number;
+};
 
-  // Mock chart data - in real app, aggregate from Firestore
-  const chartData = [
-    { name: 'Mon', reports: 4 },
-    { name: 'Tue', reports: 3 },
-    { name: 'Wed', reports: 7 },
-    { name: 'Thu', reports: 2 },
-    { name: 'Fri', reports: 5 },
-    { name: 'Sat', reports: 1 },
-    { name: 'Sun', reports: 2 },
-  ];
+const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export default function Overview() {
+  const [stats, setStats] = useState<Stats>({
+    totalUsers: 0,
+    pendingReports: 0,
+    resolvedReports: 0,
+  });
+
+  const [chartData, setChartData] = useState<
+    { name: string; reports: number }[]
+  >(
+    days.map(day => ({ name: day, reports: 0 }))
+  );
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    /* ---------- ACTIVE USERS (REAL-TIME) ---------- */
+    const unsubscribeUsers = onSnapshot(
+      query(
+        collection(db, "approved_users"),
+        where("isActive", "==", true)
+      ),
+      snapshot => {
+        setStats(prev => ({
+          ...prev,
+          totalUsers: snapshot.size,
+        }));
+      }
+    );
+
+    /* ---------- REPORT STATS (REAL-TIME) ---------- */
+    const unsubscribeReports = onSnapshot(
+      collection(db, "reports"),
+      snapshot => {
+        let pending = 0;
+        let resolved = 0;
+
+        const counts: Record<string, number> = {
+          Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0
+        };
+
+        const startOfWeek = new Date();
+        startOfWeek.setDate(startOfWeek.getDate() - 6);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+
+          if (data.status === "pending") pending++;
+          if (data.status === "resolved") resolved++;
+
+          const createdAt = data.createdAt?.toDate?.();
+          if (createdAt && createdAt >= startOfWeek) {
+            const day = days[createdAt.getDay()];
+            counts[day]++;
+          }
+        });
+
+        setStats(prev => ({
+          ...prev,
+          pendingReports: pending,
+          resolvedReports: resolved,
+        }));
+
+        setChartData(
+          days.map(day => ({
+            name: day,
+            reports: counts[day],
+          }))
+        );
+
+        setIsLoading(false);
+      }
+    );
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeReports();
+    };
+  }, []);
 
   if (isLoading) {
     return <div className="p-8">Loading dashboard statistics...</div>;
@@ -33,85 +116,57 @@ export default function Overview() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-display font-bold text-slate-900">Dashboard Overview</h1>
-        <p className="text-muted-foreground mt-2">Welcome back. Here's what's happening today.</p>
+        <h1 className="text-3xl font-display font-bold text-slate-900">
+          Dashboard Overview
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          Welcome back. Here's what's happening today.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
-          title="Total Users"
-          value={stats?.totalUsers || 0}
+          title="Active Users"
+          value={stats.totalUsers}
           icon={Users}
-          color="secondary"
         />
         <StatsCard
           title="Pending Reports"
-          value={stats?.pendingReports || 0}
+          value={stats.pendingReports}
           icon={AlertCircle}
           color="destructive"
-          trend="+2 new today"
         />
         <StatsCard
           title="Resolved Cases"
-          value={stats?.resolvedReports || 0}
+          value={stats.resolvedReports}
           icon={CheckCircle2}
-          color="accent"
         />
         <StatsCard
           title="Total Reports"
-          value={(stats?.pendingReports || 0) + (stats?.resolvedReports || 0)}
+          value={stats.pendingReports + stats.resolvedReports}
           icon={FileText}
-          color="primary"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Chart Section */}
-        <div className="dashboard-card min-h-[400px]">
-          <h3 className="text-lg font-bold mb-6">Weekly Report Activity</h3>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b' }} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b' }} 
-                />
-                <Tooltip 
-                  cursor={{ fill: 'transparent' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="reports" radius={[4, 4, 0, 0]}>
-                  {chartData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 2 ? 'var(--primary)' : '#cbd5e1'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      <div className="dashboard-card min-h-[400px]">
+        <h3 className="text-lg font-bold mb-6">
+          Weekly Report Activity
+        </h3>
 
-        {/* Recent Activity / Quick Actions could go here */}
-        <div className="dashboard-card">
-          <h3 className="text-lg font-bold mb-4">System Status</h3>
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-green-50 border border-green-100 flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm font-medium text-green-700">Database Connection Active</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-              <h4 className="font-medium text-sm text-slate-900">Latest System Update</h4>
-              <p className="text-xs text-slate-500 mt-1">Admin dashboard v1.0.2 deployed successfully.</p>
-            </div>
-          </div>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} />
+              <YAxis axisLine={false} tickLine={false} />
+              <Tooltip />
+              <Bar dataKey="reports" radius={[4, 4, 0, 0]}>
+                {chartData.map((_, index) => (
+                  <Cell key={index} fill="var(--primary)" />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

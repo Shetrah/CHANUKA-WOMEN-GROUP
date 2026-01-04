@@ -1,67 +1,139 @@
-import { useState } from "react";
-import { useUsers, useCreateUser, useUpdateUser } from "@/hooks/use-users";
+import { useEffect, useState } from "react";
+import {
+  collection,
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  doc,
+  serverTimestamp,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Users2, MoreHorizontal, UserX, UserCheck, Users } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Users2,
+  MoreHorizontal,
+  UserX,
+  UserCheck,
+  Trash2,
+  Search,
+  Plus,
+  Users,
+} from "lucide-react";
 import { format } from "date-fns";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertApprovedUserSchema } from "@shared/schema";
-import { z } from "zod";
 
-// Schema including name and email
-const formSchema = insertApprovedUserSchema.extend({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-});
+/* ---------------- TYPES ---------------- */
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "member" | "moderator" | "admin";
+  isActive: boolean;
+  approvedAt?: Timestamp;
+}
 
-type UserFormValues = z.infer<typeof formSchema>;
-
-// Function to get initials from full name
-const getInitials = (name: string) => {
-  if (!name) return "";
-  const parts = name.trim().split(" ");
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
+/* ---------------- UTIL ---------------- */
+const getInitials = (name = ""): string => {
+  const p = name.trim().split(" ");
+  return p.length === 1
+    ? p[0][0]?.toUpperCase() ?? ""
+    : (p[0][0] + p[1][0]).toUpperCase();
 };
 
+/* =========================
+   MAIN PAGE
+========================= */
 export default function UsersPage() {
-  const { data: users, isLoading } = useUsers();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  // Safe search filtering with optional chaining and defaults
-  const filteredUsers = users?.filter(user => 
-    (user.name ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (user.email ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (user.role ?? "").toLowerCase().includes(searchTerm.toLowerCase())
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<User["role"]>("member");
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "approved_users"), (snap) => {
+      const data: User[] = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<User, "id">),
+      }));
+
+      setUsers(data.filter((u) => u.role !== "admin"));
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, []);
+
+  const filteredUsers = users.filter(
+    (u) =>
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      u.role.toLowerCase().includes(search.toLowerCase())
   );
+
+  const addUser = async () => {
+    if (!name || !email) return;
+
+    await addDoc(collection(db, "approved_users"), {
+      name,
+      email,
+      role,
+      isActive: true,
+      approvedAt: serverTimestamp(),
+    });
+
+    setName("");
+    setEmail("");
+    setRole("member");
+    setOpen(false);
+  };
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* HEADER */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-display font-bold text-slate-900">User Management</h1>
-          <p className="text-muted-foreground mt-1">Manage approved admins and staff access.</p>
+          <h1 className="text-3xl font-bold">User Management</h1>
+          <p className="text-muted-foreground">
+            Manage active users (admins excluded)
+          </p>
         </div>
-        <CreateUserDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+
+        <Button onClick={() => setOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add User
+        </Button>
       </div>
 
+      {/* TABLE CARD */}
       <div className="dashboard-card p-0 overflow-hidden">
-        {/* Toolbar */}
-        <div className="p-4 border-b border-border bg-slate-50/50 flex items-center gap-4">
-          <div className="relative flex-1 max-w-sm">
+        {/* Search */}
+        <div className="p-4 border-b flex gap-3">
+          <div className="relative max-w-sm w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search by name, email, or role..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 bg-white"
+            <Input
+              placeholder="Search users..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
             />
           </div>
         </div>
@@ -69,35 +141,32 @@ export default function UsersPage() {
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-50 border-b border-border text-xs uppercase text-muted-foreground font-semibold">
+            <thead className="bg-slate-50 border-b text-xs uppercase">
               <tr>
-                <th className="px-6 py-4 text-left">User</th>
-                <th className="px-6 py-4 text-left">Role</th>
-                <th className="px-6 py-4 text-left">Status</th>
-                <th className="px-6 py-4 text-left">Approved On</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4 text-left w-[35%]">User</th>
+                <th className="px-6 py-4 text-left w-[20%]">Role</th>
+                <th className="px-6 py-4 text-left w-[15%]">Status</th>
+                <th className="px-6 py-4 text-left w-[20%]">Approved</th>
+                <th className="px-6 py-4 text-right w-[10%]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {isLoading ? (
+
+            <tbody className="divide-y">
+              {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
-                    Loading users...
+                  <td colSpan={5} className="px-6 py-10 text-center">
+                    Loading users…
                   </td>
                 </tr>
-              ) : filteredUsers?.length === 0 ? (
+              ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
-                        <Users className="w-6 h-6 text-slate-400" />
-                      </div>
-                      <p className="text-muted-foreground font-medium">No users found</p>
-                    </div>
+                    <Users className="mx-auto mb-2 text-slate-400" />
+                    No users found
                   </td>
                 </tr>
               ) : (
-                filteredUsers?.map((user) => (
+                filteredUsers.map((user) => (
                   <UserRow key={user.id} user={user} />
                 ))
               )}
@@ -105,157 +174,143 @@ export default function UsersPage() {
           </table>
         </div>
       </div>
+
+      {/* ADD USER MODAL */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Input
+              placeholder="Full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+
+            <Input
+              placeholder="Email address"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+
+            <label htmlFor="roleSelect" className="sr-only">
+              Select role
+            </label>
+
+            <select
+              id="roleSelect"
+              value={role}
+              onChange={(e) =>
+                setRole(e.target.value as User["role"])
+              }
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              <option value="member">Member</option>
+              <option value="moderator">Moderator</option>
+            </select>
+
+            <Button className="w-full" onClick={addUser}>
+              Add User
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function UserRow({ user }: { user: any }) {
-  const toggleStatus = useUpdateUser();
-  
-  const handleToggleStatus = () => {
-    toggleStatus.mutate({
-      id: user.id,
-      isActive: !user.isActive
+/* =========================
+   USER ROW
+========================= */
+function UserRow({ user }: { user: User }) {
+  const toggleStatus = async () => {
+    await updateDoc(doc(db, "approved_users", user.id), {
+      isActive: !user.isActive,
     });
   };
 
+  const deleteUser = async () => {
+    if (
+      !confirm(`Delete ${user.name}? This cannot be undone.`)
+    )
+      return;
+
+    await deleteDoc(doc(db, "approved_users", user.id));
+  };
+
   return (
-    <tr className="hover:bg-slate-50/50 transition-colors">
+    <tr className="hover:bg-slate-50">
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-            {getInitials(user.name ?? "")}
+          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
+            {getInitials(user.name)}
           </div>
           <div>
-            <div className="font-medium text-slate-900">{user.name ?? "No Name"} <span className="text-sm text-muted-foreground">({user.email ?? "No Email"})</span></div>
-            <div className="text-xs text-muted-foreground">ID: {user.id?.substring(0, 8) ?? "N/A"}...</div>
+            <div className="font-medium">{user.name}</div>
+            <div className="text-xs text-muted-foreground">
+              {user.email}
+            </div>
           </div>
         </div>
       </td>
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-2 text-sm text-slate-700">
-          <Users2 className="w-4 h-4 text-slate-400" />
-          <span className="capitalize">{user.role ?? "N/A"}</span>
-        </div>
+
+      <td className="px-6 py-4 capitalize">
+        <Users2 className="inline w-4 h-4 mr-2 text-slate-400" />
+        {user.role}
       </td>
+
       <td className="px-6 py-4">
-        <Badge variant={user.isActive ? "default" : "secondary"} className={
-          user.isActive 
-            ? "bg-green-100 text-green-700 hover:bg-green-100 shadow-none border-green-200" 
-            : "bg-slate-100 text-slate-500 hover:bg-slate-100 shadow-none border-slate-200"
-        }>
+        <Badge
+          className={
+            user.isActive
+              ? "bg-green-100 text-green-700"
+              : "bg-slate-100 text-slate-500"
+          }
+        >
           {user.isActive ? "Active" : "Inactive"}
         </Badge>
       </td>
+
       <td className="px-6 py-4 text-sm text-slate-500">
-        {user.createdAt ? format(new Date(user.createdAt), 'MMM d, yyyy') : '-'}
+        {user.approvedAt
+          ? format(user.approvedAt.toDate(), "MMM d, yyyy")
+          : "-"}
       </td>
+
       <td className="px-6 py-4 text-right">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-900">
+            <Button size="icon" variant="ghost">
               <MoreHorizontal className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
+
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleToggleStatus} className={user.isActive ? "text-destructive" : "text-green-600"}>
+            <DropdownMenuItem onClick={toggleStatus}>
               {user.isActive ? (
                 <>
-                  <UserX className="w-4 h-4 mr-2" /> Deactivate User
+                  <UserX className="w-4 h-4 mr-2" /> Deactivate
                 </>
               ) : (
                 <>
-                  <UserCheck className="w-4 h-4 mr-2" /> Activate User
+                  <UserCheck className="w-4 h-4 mr-2" /> Activate
                 </>
               )}
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={deleteUser}
+              className="text-red-600"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </td>
     </tr>
-  );
-}
-
-function CreateUserDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
-  const createUser = useCreateUser();
-  const form = useForm<UserFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      role: "admin",
-      isActive: true,
-      approvedBy: "System Admin",
-    },
-  });
-
-  const onSubmit = (data: UserFormValues) => {
-    createUser.mutate(data, {
-      onSuccess: () => {
-        onOpenChange(false);
-        form.reset();
-      }
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button className="btn-primary">
-          <Plus className="w-4 h-4 mr-2" />
-          Add User
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add New User</DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-          {/* Name */}
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input id="name" {...form.register("name")} placeholder="John Doe" />
-            {form.formState.errors.name && (
-              <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
-            )}
-          </div>
-
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input id="email" {...form.register("email")} placeholder="user@example.com" />
-            {form.formState.errors.email && (
-              <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
-            )}
-          </div>
-
-          {/* Role */}
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Select 
-              defaultValue="admin" 
-              onValueChange={(val) => form.setValue("role", val)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="moderator">Moderator</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" className="btn-primary" disabled={createUser.isPending}>
-              {createUser.isPending ? "Creating..." : "Create User"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   signInWithEmailAndPassword,
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -67,20 +68,25 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-slate-950">
+    <div className="relative min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-slate-950 overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
           src="https://images.unsplash.com/photo-1544027993-37dbfe43562a?q=80&w=2070&auto=format&fit=crop"
           alt="Community Support"
-          className="w-full h-full object-cover opacity-40"
+          className="w-full h-full object-cover opacity-30"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/80" />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-black/80" />
       </div>
 
       {/* Left Side – Login */}
       <div className="relative z-10 flex items-center justify-center px-6 lg:px-20">
-        <div className="w-full max-w-md">
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="w-full max-w-md"
+        >
           {/* Glass Card */}
           <div className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl p-8 lg:p-10">
             
@@ -95,10 +101,10 @@ export default function Login() {
 
             {/* Heading */}
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-amber-400">
                 Chanuka Deaf Women Group
               </h1>
-              <p className="text-slate-300 mt-2">
+              <p className="text-slate-200 mt-2">
                 Secure Admin Access Portal
               </p>
             </div>
@@ -106,24 +112,24 @@ export default function Login() {
             {/* Form */}
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="space-y-2">
-                <Label className="text-slate-200">Email Address</Label>
+                <Label className="text-slate-100 font-medium">Email Address</Label>
                 <Input
                   type="email"
                   placeholder="admin@example.org"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="h-12 bg-white/20 border-white/30 text-white placeholder:text-slate-300 focus:border-primary"
+                  className="h-12 bg-white/20 border-white/30 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary"
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <Label className="text-slate-200">Password</Label>
+                  <Label className="text-slate-100 font-medium">Password</Label>
                   <button
                     type="button"
                     onClick={handleForgotPassword}
-                    className="text-sm text-primary hover:underline"
+                    className="text-sm text-amber-300 hover:text-amber-400 hover:underline transition-colors"
                   >
                     Forgot password?
                   </button>
@@ -135,53 +141,64 @@ export default function Login() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="h-12 bg-white/20 border-white/30 text-white pr-10"
+                    className="h-12 bg-white/20 border-white/30 text-white pr-10 focus:border-primary focus:ring-primary"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-white"
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-5 h-5" />
-                    ) : (
-                      <Eye className="w-5 h-5" />
-                    )}
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 shadow-lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  "Sign In to Dashboard"
-                )}
-              </Button>
+              <motion.div whileHover={{ scale: 1.03 }} transition={{ type: "spring", stiffness: 300 }}>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-amber-400 hover:from-primary/90 hover:to-amber-400/90 shadow-lg transition-all"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    "Sign In to Dashboard"
+                  )}
+                </Button>
+              </motion.div>
             </form>
 
-            {/* Footer */}
-            <div className="mt-8 text-center text-xs text-slate-300 space-y-2">
-              <p>Protected system. Unauthorized access prohibited.</p>
-              <p className="opacity-80">Powered & Built by NexxaCraft</p>
-            </div>
+            {/* Footer + Support Info */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6, duration: 1 }}
+              className="mt-8 text-center space-y-3"
+            >
+              {/* Support contacts */}
+              <div className="text-sm text-slate-100 space-y-1">
+                <p className="font-semibold text-amber-300">Need Help?</p>
+                <p>Gender Desk Officer - Kondele Police Station: <span className="text-amber-200 font-medium">Rachael 0700729559</span></p>
+                <p>JOOTRH GBVRC - Anastasia: <span className="text-amber-200 font-medium">0722359942</span></p>
+              </div>
+
+              {/* System notice */}
+              <p className="text-xs text-slate-300">Protected system. Unauthorized access prohibited.</p>
+              <p className="text-xs text-slate-300 opacity-80">Powered & Built by: NexxaCraft</p>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Right Side – Text */}
       <div className="relative z-10 hidden lg:flex flex-col justify-end p-16 text-white">
-        <h2 className="text-4xl font-bold mb-4">
+        <h2 className="text-4xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-primary to-amber-400">
           Empowering Community Voices
         </h2>
-        <p className="text-lg text-slate-300 max-w-xl">
+        <p className="text-lg text-slate-200 max-w-xl">
           Securely manage reports, users, and sensitive data with confidence
           and accountability.
         </p>
