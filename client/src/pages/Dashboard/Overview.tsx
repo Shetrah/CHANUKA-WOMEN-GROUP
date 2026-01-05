@@ -24,6 +24,7 @@ type Stats = {
   totalUsers: number;
   pendingReports: number;
   resolvedReports: number;
+  totalReports: number;
 };
 
 const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -33,18 +34,17 @@ export default function Overview() {
     totalUsers: 0,
     pendingReports: 0,
     resolvedReports: 0,
+    totalReports: 0,
   });
 
   const [chartData, setChartData] = useState<
     { name: string; reports: number }[]
-  >(
-    days.map(day => ({ name: day, reports: 0 }))
-  );
+  >(days.map(day => ({ name: day, reports: 0 })));
 
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    /* ---------- ACTIVE USERS (REAL-TIME) ---------- */
+    /* ---------- ACTIVE USERS ---------- */
     const unsubscribeUsers = onSnapshot(
       query(
         collection(db, "approved_users"),
@@ -58,12 +58,13 @@ export default function Overview() {
       }
     );
 
-    /* ---------- REPORT STATS (REAL-TIME) ---------- */
+    /* ---------- REPORT STATS ---------- */
     const unsubscribeReports = onSnapshot(
       collection(db, "reports"),
       snapshot => {
         let pending = 0;
         let resolved = 0;
+        let total = snapshot.size;
 
         const counts: Record<string, number> = {
           Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0
@@ -76,10 +77,19 @@ export default function Overview() {
         snapshot.forEach(doc => {
           const data = doc.data();
 
-          if (data.status === "pending") pending++;
-          if (data.status === "resolved") resolved++;
+          /* ✅ STATUS FIX */
+          if (data.status === "Pending") pending++;
+          if (data.status === "Resolved") resolved++;
 
-          const createdAt = data.createdAt?.toDate?.();
+          /* ✅ DATE FIX */
+          let createdAt: Date | null = null;
+
+          if (data.createdAt instanceof Timestamp) {
+            createdAt = data.createdAt.toDate();
+          } else if (typeof data.submittedAt === "string") {
+            createdAt = new Date(data.submittedAt);
+          }
+
           if (createdAt && createdAt >= startOfWeek) {
             const day = days[createdAt.getDay()];
             counts[day]++;
@@ -90,6 +100,7 @@ export default function Overview() {
           ...prev,
           pendingReports: pending,
           resolvedReports: resolved,
+          totalReports: total,
         }));
 
         setChartData(
@@ -143,7 +154,7 @@ export default function Overview() {
         />
         <StatsCard
           title="Total Reports"
-          value={stats.pendingReports + stats.resolvedReports}
+          value={stats.totalReports}
           icon={FileText}
         />
       </div>

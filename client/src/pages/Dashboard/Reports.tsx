@@ -84,18 +84,19 @@ const formatDateLong = (date: DateInput): string => {
 interface Report {
   id: string;
   category: string;
-  type: string;
+  type?: string;
   description: string;
   location: string;
-  status: "pending" | "reviewed" | "resolved";
+  status: "Pending" | "Reviewed" | "Resolved";
   createdAt?: Timestamp | Date | string;
   submittedAt?: string;
   reportNumber: string;
   userEmail: string;
-  userId: string;
+  userId?: string;
+  userName?: string;
   area: string;
   title: string;
-  evidenceUrl: string | null;
+  evidenceUrl?: string | null;
   lastUpdated?: Timestamp;
 }
 
@@ -105,7 +106,7 @@ interface Report {
 
 export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "pending" | "reviewed" | "resolved"
+    "all" | "Pending" | "Reviewed" | "Resolved"
   >("all");
   const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,9 +126,9 @@ export default function ReportsPage() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const reportsData: Report[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<Report, "id">),
+        const reportsData: Report[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<Report, "id">),
         }));
 
         setReports(reportsData);
@@ -162,9 +163,9 @@ export default function ReportsPage() {
         >
           <TabsList className="bg-slate-100 p-1">
             <TabsTrigger value="all">All Cases</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="reviewed">Reviewed</TabsTrigger>
-            <TabsTrigger value="resolved">Resolved</TabsTrigger>
+            <TabsTrigger value="Pending">Pending</TabsTrigger>
+            <TabsTrigger value="Reviewed">Reviewed</TabsTrigger>
+            <TabsTrigger value="Resolved">Resolved</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -206,15 +207,15 @@ function ReportCard({ report }: { report: Report }) {
   const [localReport, setLocalReport] = useState(report);
 
   const statusColors = {
-    pending: "bg-amber-100 text-amber-700 border-amber-200",
-    reviewed: "bg-blue-100 text-blue-700 border-blue-200",
-    resolved: "bg-green-100 text-green-700 border-green-200",
+    Pending: "bg-amber-100 text-amber-700 border-amber-200",
+    Reviewed: "bg-blue-100 text-blue-700 border-blue-200",
+    Resolved: "bg-green-100 text-green-700 border-green-200",
   };
 
   const statusIcons = {
-    pending: AlertTriangle,
-    reviewed: Clock,
-    resolved: CheckCircle,
+    Pending: AlertTriangle,
+    Reviewed: Clock,
+    Resolved: CheckCircle,
   };
 
   const StatusIcon = statusIcons[localReport.status];
@@ -237,10 +238,6 @@ function ReportCard({ report }: { report: Report }) {
         status: newStatus,
       });
 
-      console.log(
-        `Report ${localReport.id} status updated to ${newStatus}`
-      );
-
       setIsDetailsOpen(false);
     } catch (error) {
       console.error("Error updating report:", error);
@@ -262,9 +259,7 @@ function ReportCard({ report }: { report: Report }) {
             )}
           >
             <StatusIcon className="w-3.5 h-3.5" />
-            <span className="capitalize">
-              {localReport.status}
-            </span>
+            <span>{localReport.status}</span>
           </Badge>
 
           <div className="text-sm text-slate-500 flex items-center gap-2">
@@ -318,9 +313,7 @@ function ReportCard({ report }: { report: Report }) {
                   <Badge
                     className={cn(
                       "ml-2",
-                      statusColors[
-                        localReport.status
-                      ]
+                      statusColors[localReport.status]
                     )}
                   >
                     {localReport.status}
@@ -385,23 +378,23 @@ function ReportCard({ report }: { report: Report }) {
               </div>
 
               <DialogFooter className="gap-2">
-                {localReport.status !== "resolved" && (
+                {localReport.status !== "Resolved" && (
                   <Button
                     disabled={isUpdating}
                     onClick={() =>
-                      handleStatusChange("resolved")
+                      handleStatusChange("Resolved")
                     }
                   >
                     Mark Resolved
                   </Button>
                 )}
 
-                {localReport.status === "pending" && (
+                {localReport.status === "Pending" && (
                   <Button
                     disabled={isUpdating}
                     variant="outline"
                     onClick={() =>
-                      handleStatusChange("reviewed")
+                      handleStatusChange("Reviewed")
                     }
                   >
                     Mark Reviewed
